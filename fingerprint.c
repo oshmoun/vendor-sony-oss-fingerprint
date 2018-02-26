@@ -62,8 +62,14 @@ void *enroll_thread_loop(void *arg)
     }
 
     int status = 1;
+    int powered_on = 1;
 
-    while((status = fpc_capture_image(sdev->fpc)) >= 0) {
+    if (fpc_set_power(FPC_PWRON) < 0) {
+        ALOGE("Error starting device\n");
+        powered_on = 0;
+    }
+
+    while((status = fpc_capture_image(sdev->fpc) && powered_on) >= 0) {
         ALOGD("%s : Got Input status=%d", __func__, status);
 
         if (status <= FINGERPRINT_ACQUIRED_TOO_FAST) {
@@ -137,6 +143,10 @@ void *enroll_thread_loop(void *arg)
         pthread_mutex_unlock(&sdev->lock);
     }
 
+    if (powered_on && fpc_set_power(FPC_PWROFF) < 0) {
+        ALOGE("Error stopping device\n");
+    }
+
     uint32_t print_id = 0;
     ALOGI("%s : finishing",__func__);
 
@@ -157,6 +167,12 @@ void *auth_thread_loop(void *arg)
     fpc_auth_start(sdev->fpc);
 
     int status = 1;
+    int powered_on = 1;
+
+    if (fpc_set_power(FPC_PWRON) < 0) {
+        ALOGE("Error starting device\n");
+        powered_on = 0;
+    }
 
     while((status = fpc_capture_image(sdev->fpc)) >= 0 ) {
         ALOGV("%s : Got Input with status %d", __func__, status);
@@ -211,6 +227,10 @@ void *auth_thread_loop(void *arg)
                 }
             }
         }
+    }
+
+    if (powered_on && fpc_set_power(FPC_PWROFF) < 0) {
+        ALOGE("Error stopping device\n");
     }
 
     fpc_auth_end(sdev->fpc);

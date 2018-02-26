@@ -1,0 +1,83 @@
+diff --git a/fingerprint.c b/fingerprint.c
+index 3d9238a..d2fa389 100644
+--- a/fingerprint.c
++++ b/fingerprint.c
+@@ -62,8 +62,14 @@ void *enroll_thread_loop(void *arg)
+     }
+ 
+     int status = 1;
++    int powered_on = 1;
+ 
+-    while((status = fpc_capture_image(sdev->fpc)) >= 0) {
++    if (fpc_set_power(FPC_PWRON) < 0) {
++        ALOGE("Error starting device\n");
++        powered_on = 0;
++    }
++
++    while((status = fpc_capture_image(sdev->fpc) && powered_on) >= 0) {
+         ALOGD("%s : Got Input status=%d", __func__, status);
+ 
+         if (status <= FINGERPRINT_ACQUIRED_TOO_FAST) {
+@@ -137,6 +143,10 @@ void *enroll_thread_loop(void *arg)
+         pthread_mutex_unlock(&sdev->lock);
+     }
+ 
++    if (powered_on && fpc_set_power(FPC_PWROFF) < 0) {
++        ALOGE("Error stopping device\n");
++    }
++
+     uint32_t print_id = 0;
+     ALOGI("%s : finishing",__func__);
+ 
+@@ -157,6 +167,12 @@ void *auth_thread_loop(void *arg)
+     fpc_auth_start(sdev->fpc);
+ 
+     int status = 1;
++    int powered_on = 1;
++
++    if (fpc_set_power(FPC_PWRON) < 0) {
++        ALOGE("Error starting device\n");
++        powered_on = 0;
++    }
+ 
+     while((status = fpc_capture_image(sdev->fpc)) >= 0 ) {
+         ALOGV("%s : Got Input with status %d", __func__, status);
+@@ -213,6 +229,10 @@ void *auth_thread_loop(void *arg)
+         }
+     }
+ 
++    if (powered_on && fpc_set_power(FPC_PWROFF) < 0) {
++        ALOGE("Error stopping device\n");
++    }
++
+     fpc_auth_end(sdev->fpc);
+     ALOGI("%s : finishing",__func__);
+ 
+diff --git a/fpc_imp_loire_tone.c b/fpc_imp_loire_tone.c
+index cb8f090..d2e93ec 100644
+--- a/fpc_imp_loire_tone.c
++++ b/fpc_imp_loire_tone.c
+@@ -375,11 +375,6 @@ err_t fpc_capture_image(fpc_imp_data_t *data)
+ 
+     fpc_data_t *ldata = (fpc_data_t*)data;
+ 
+-    if (fpc_set_power(FPC_PWRON) < 0) {
+-        ALOGE("Error starting device\n");
+-        return -1;
+-    }
+-
+     int ret = fpc_wait_finger_lost(data);
+     if(!ret)
+     {
+@@ -396,11 +391,6 @@ err_t fpc_capture_image(fpc_imp_data_t *data)
+         ret = 1000;
+     }
+ 
+-    if (fpc_set_power(FPC_PWROFF) < 0) {
+-        ALOGE("Error stopping device\n");
+-        return -1;
+-    }
+-
+     send_normal_command(ldata, FPC_INIT);
+     return ret;
+ }
